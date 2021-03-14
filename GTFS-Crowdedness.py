@@ -9,27 +9,29 @@ GTFSDIR = 'gtfs-nl'    # https://transitfeeds.com/p/ov/814/20190705
 NDOVDIR = 'ndov'
 displaydate = '20210309'
 
+
 def min2str(minutes):
     """
     Convert hh:mm:ss to seconds since midnight
-    :param show_sec: only show :ss if True
-    :param scnds: Seconds to translate to hh:mm:ss
     """
     h = int((int(minutes) / 60) % 24)
     m = int(minutes % 60)
     return "{:02d}:{:02d}".format(h, m)
 
+
 def str2min(time_str):
     """
     Convert hh:mm:ss to minutes since midnight
-    :param time_str: String in format hh:mm:ss
     """
     spl = time_str.strip().split(":")
     h, m, s = spl
     return int(h) * 60 + int(m)
 
-# Show progress bar
+
 def update_progress(part, total=100, barLength=50):
+    """
+    Show progress bar
+    """
     progress = (float(part)) / total
     status = ""
     if progress < 0:
@@ -147,6 +149,7 @@ stops.loc[stops['stop_code'].isnull(),'stop_code'] = stops['zone_id']
 # shapes = pd.read_csv(os.path.join(GTFSDIR, 'shapes.txt'))
 shapes = read_csv('shapes.txt')
 
+
 ########################################################################################################
 ################### DETERMINE FOR ALL TRIPS FOR EVERY MINUTE THE LOCATION ##############################
 ########################################################################################################
@@ -232,17 +235,18 @@ for r in trips[mask1 & mask2].trip_short_name.unique():
     i += 1
 timedata = timedata.merge(stops[['stop_id', 'stop_code', 'stop_name']])
 
+
 ########################################################################################################
 ############################# COMBINE TRIPDATA WITH CROWDEDNESS ########################################
 ########################################################################################################
 timedata = timedata.merge(druktedata[['ritnumber', 'departure', 'classification', 'seats', 'operator']], 
-               left_on=['ritnumber', 'stop_code'], right_on=['ritnumber', 'departure'])
+               left_on=['ritnumber', 'stop_code'], right_on=['ritnumber', 'departure']).drop(columns=['trip_id'])
 
 timedata.time = timedata.time.apply(lambda x: min2str(x))
 timedata['passengers'] = ((timedata.classification - 1) * timedata.seats * 0.33).astype(int)
 timedata['timestamp'] = (pd.to_datetime(timedata['time']) - pd.Timestamp("1970-01-01")) // pd.Timedelta('1s')
 timedata['elevation'] = 0
-timedata = timedata.drop(columns=['trip_id'])
+
 
 ########################################################################################################
 ################################ EXPORT GEOJSON FOR ANIMATION #########################################
@@ -268,10 +272,10 @@ for rn in timedata.ritnumber.unique():
         )
     update_progress(i, total=total, barLength=50) 
 
-feature_collection = FeatureCollection(features)
 with open('trainpag.geojson', 'w') as outfile:
-        dump(feature_collection, outfile)
-    
+        dump(FeatureCollection(features), outfile)
+
+        
 ########################################################################################################
 ############################### EXPORT GTFS WITH TRAIN NETWORK #########################################
 ########################################################################################################
@@ -290,7 +294,5 @@ for si in network.shape_id.unique():
     )
     update_progress(i, total=total, barLength=50) 
 
-feature_collection = FeatureCollection(features)
 with open('network.geojson', 'w') as outfile:
-        dump(feature_collection, outfile)
-    
+        dump(FeatureCollection(features), outfile)
