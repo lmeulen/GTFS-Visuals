@@ -31,16 +31,6 @@ routes = sjoin(routes, nl, how='left')
 routes = routes[routes.name == 'Netherlands']
 
 
-def get_value(jsn, key1, key2=None):
-    if jsn and key1 and (key1 in jsn):
-        if key2:
-            return jsn[key1][key2] if key2 in jsn[key1] else None
-        else:
-            return jsn[key1]
-    else:
-        return None
-
-
 URL = 'http://localhost:8080/otp/routers/default/plan?'
 legs = []
 
@@ -65,41 +55,28 @@ for c, d in routes.iterrows():
             for leg in itineraries[0]['legs']:
                 mode = get_value(leg, 'mode')
                 if mode != 'WALK':
-                    legs.append([mode, get_value(leg, 'routeId'), get_value(leg, 'tripId'),
-                                 get_value(leg, 'tripShortName'),
-                                 get_value(leg, 'from', 'stopIndex'), get_value(leg, 'from', 'stopId'),
-                                 get_value(leg, 'from', 'stopCode'), get_value(leg, 'to', 'stopIndex'),
-                                 get_value(leg, 'to', 'stopId'), get_value(leg, 'from', 'stopCode'),
-                                 get_value(leg, 'legGeometry', 'points'),
-                                 get_value(leg, 'legGeometry', 'length')])
+                    legs.append([mode, leg['legGeometry']['points']])
         except:
             print('Error routing')
 
 legs_df = pd.DataFrame(legs)
-legs_df.columns = ['mode', 'routeId', 'tripId', 'tripShortName', 'fromStopIndex', 'fromStopId', 'fromStopCode',
-               'toStopIndex', 'toStopId', 'toStopCode', 'geometryPoints', 'geometryLength']
-legs_df.to_csv('allroadstoUT.csv', index=False)
+legs_df.columns = ['mode', 'geometryPoints']
 
-legs_df = legs_df[['geometryPoints', 'mode']].groupby(['geometryPoints']).count().reset_index()
-legs_df = legs_df.rename(columns={'mode': 'count'}).sort_values('count')
+legs_df = legs_df.groupby(['geometryPoints']).count().reset_index().rename(columns={'mode': 'count'}).sort_values('count')
 
 
 def next_val(datastring, index):
     b = None
-    res = 0
-    shift = 0
+    res = shift = 0
     while b is None or b >= 0x20:
-        b = ord(datastring[index])  # integer  representing the Unicode character
-        b -= 63
-        b = (b & 0x1f) << shift
-        res |= b
+        b = ord(datastring[index]) - 63
+        res |= ( (b & 0x1f) << shift )
         index += 1
         shift += 5
-        comp = res & 1
-    res = res >> 1
-    if comp:
-        res = ~res
-    return res, index
+    if res & 1:
+        return ~(res >> 1), index
+    else:
+        return (res >> 1), index
 
 
 def decode(datastring):
@@ -112,9 +89,9 @@ def decode(datastring):
         delta_lon, index = next_val(datastring, index)
         lat += delta_lat
         lon += delta_lon
-        coordinates.append((lat / (10**5), lon / (10**5)))
-
+        coordinates.append((lat / 100000.0, lon / 100000.0)))
     return coordinates
+
 
 segments = []
 for c, g in legs_df.iterrows():
@@ -125,12 +102,11 @@ for c, g in legs_df.iterrows():
         segments.append([lat_prev, lon_prev, s[0], s[1], cnt])
         lat_prev = s[0]
         lon_prev = s[1]
-segments_df = pd.DataFrame(segments)
-segments_df.columns = ['lat_x', 'lon_x', 'lat_y', 'lon_y', 'count']
+
+segments_df = pd.DataFrame(segments, columns = ['lat_x', 'lon_x', 'lat_y', 'lon_y', 'count'])
 segments_df = segments_df[segments_df.lat_x > 0.0]
 
-segments_df = segments_df.groupby(['lat_x', 'lon_x', 'lat_y', 'lon_y']).sum()
-segments_df = segments_df.reset_index().sort_values('count')
+segments_df = segments_df.groupby(['lat_x', 'lon_x', 'lat_y', 'lon_y']).sum().reset_index().sort_values('count')
 
 segments_df['line'] = segments_df.apply(lambda x: LineString([Point(x["lon_x"], x["lat_x"]),
                                                               Point(x["lon_y"], x["lat_y"])]), axis=1)
