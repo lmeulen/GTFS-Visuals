@@ -65,7 +65,7 @@ legs_df.columns = ['mode', 'geometryPoints']
 legs_df = legs_df.groupby(['geometryPoints']).count().reset_index().rename(columns={'mode': 'count'}).sort_values('count')
 
 
-def next_val(datastring, index):
+def pop_val(datastring, index):
     b = None
     res = shift = 0
     while b is None or b >= 0x20:
@@ -75,21 +75,19 @@ def next_val(datastring, index):
         shift += 5
     if res & 1:
         return ~(res >> 1), index
-    else:
-        return (res >> 1), index
+    return (res >> 1), index
 
 
 def decode(datastring):
     coordinates = []
     lat = lon = 0
-
-    index = 0
-    while index < len(datastring):
-        delta_lat, index = next_val(datastring, index)
-        delta_lon, index = next_val(datastring, index)
-        lat += delta_lat
-        lon += delta_lon
-        coordinates.append((lat / 100000.0, lon / 100000.0)))
+    idx = 0
+    while idx < len(datastring):
+        delta_lat, idx = pop_val(datastring, idx)
+        delta_lon, idx = pop_val(datastring, idx)
+        lat += delta_lat / 100000.0
+        lon += delta_lon / 100000.0
+        coordinates.append((lat, lon))
     return coordinates
 
 
