@@ -34,6 +34,17 @@ routes = routes[routes.name == 'Netherlands']
 URL = 'http://localhost:8080/otp/routers/default/plan?'
 legs = []
 
+def get_value(obj, lvl1, lvl2=None):
+    res = None;
+    if obj and (lvl1 in obj):
+        res =  obj[lvl1]
+        if res and lvl2:
+            if (lvl2 in res):
+                res = res[lvl2]
+            else:
+                res = None
+    return res
+
 # Takes CSV input, creates URLs, stores data locally in row array
 for c, d in routes.iterrows():
     print(str(c) + ' / ' + str(len(routes)))
